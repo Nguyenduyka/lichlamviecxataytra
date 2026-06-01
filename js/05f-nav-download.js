@@ -356,7 +356,7 @@ function exportWord(){
     children:[
       qhTable,
       p(''),
-      p('LỊCH LÀM VIỆC CỦA UỶ BAN NHÂN DÂN XÃ TÂY TRÀ BỒNG',{center:true,bold:true,sz:26,before:80,after:40}),
+      p('LỊCH LÀM VIỆC CỦA UỶ BAN NHÂN DÂN XÃ TÂY TRÀ',{center:true,bold:true,sz:26,before:80,after:40}),
       p('(Tuần '+wn+': Từ ngày '+fmtVi(ws)+' đến ngày '+fmtVi(we)+')',{center:true,it:true,sz:22,after:120}),
       mainTable,
       p('Ghi chú: Ngoài thời gian đã bố trí lịch nêu trên, các đồng chí Lãnh đạo UBND xã xử lý công việc tại cơ quan.',{it:true,sz:20,before:120}),
