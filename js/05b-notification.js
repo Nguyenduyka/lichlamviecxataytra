@@ -224,7 +224,19 @@ function clearNotif(){
 let _npMsgLog = [];
 let _npScrollDate = null; // ngày cần scroll đến từ thông báo
 let _npScrollEvId = null; // id lịch cần highlight
-(function(){try{_npMsgLog=JSON.parse(localStorage.getItem('llv_np_log')||'[]');}catch(e){_npMsgLog=[];}})();
+(function(){
+  try{_npMsgLog=JSON.parse(localStorage.getItem('llv_np_log')||'[]');}catch(e){_npMsgLog=[];}
+  // Dọn trùng cũ: giữ mục ĐẦU TIÊN cho mỗi evId (bản trước có thể đã lưu trùng 2 lần)
+  try{
+    var _seen={}, _out=[];
+    for(var i=0;i<_npMsgLog.length;i++){
+      var _x=_npMsgLog[i];
+      if(_x && _x.evId){ if(_seen[_x.evId]) continue; _seen[_x.evId]=1; }
+      _out.push(_x);
+    }
+    if(_out.length!==_npMsgLog.length){ _npMsgLog=_out; localStorage.setItem('llv_np_log',JSON.stringify(_npMsgLog)); }
+  }catch(e){}
+})();
 // Cập nhật badge ngay sau khi DOM sẵn sàng
 function _initBadge(){
   if(typeof _syncAllBadges==='function') _syncAllBadges();
@@ -234,7 +246,10 @@ if(document.readyState==='loading'){document.addEventListener('DOMContentLoaded'
 else{setTimeout(_initBadge,0);}
 
 function _addNotifMsg(item){
-  const existing=_npMsgLog.find(x=>x.ts===item.ts);
+  // Chống trùng theo ts HOẶC evId. Một lịch có thể tới từ 2 nguồn:
+  // push_trigger (ts = thời điểm push) và rebuild từ events.isNew (ts = e.isNew)
+  // → khác ts nhưng cùng evId. So thêm evId để không hiện 2 lần.
+  const existing=_npMsgLog.find(x=>x.ts===item.ts || (item.evId && x.evId && x.evId===item.evId));
   if(existing){
     // Cập nhật date/evId nếu trước đó chưa có (push từ Firebase thiếu date)
     if(!existing.date && item.date) existing.date=item.date;
