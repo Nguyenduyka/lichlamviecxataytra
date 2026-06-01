@@ -337,15 +337,9 @@ return;}
     fbAuth=firebase.auth(app);
     try{fbStorage=firebase.storage(app);}catch(e){}
 
-    // App Check với ReCaptcha v3 — bắt buộc vì Firebase Console enforce
-    try{
-      const appCheck=firebase.appCheck(app);
-      appCheck.activate(
-        new firebase.appCheck.ReCaptchaV3Provider('6LfbAb8sAAAAAKZcyfYgP44DMLo3P5TxvAK8Rh4v'),
-        true // auto-refresh token
-      );
-      log('[AppCheck] activated');
-    }catch(e){logWarn('[AppCheck] init failed:',e.message);}
+    // App Check đã được gỡ bỏ cho lịch xã Tây Trà (không enforce trên RTDB/Storage).
+    // Nếu sau này muốn bật lại: nạp firebase-app-check-compat.js ở index.html,
+    // khai báo domain trong reCAPTCHA admin, rồi activate ReCaptchaV3Provider ở đây.
 
     fbReady=true;
     log('[Firebase] SDK ready');
