@@ -528,7 +528,7 @@ async function uploadFileToStorage(file,pendingId){
     const ref=fbStorage.ref(path);
 
     await new Promise(function(resolve,reject){
-      const task=ref.put(blob,{contentType:finalType,contentDisposition:'inline; filename="'+finalName+'"'});
+      const task=ref.put(blob,{contentType:finalType,contentDisposition:'inline; filename="'+finalName+'"',cacheControl:'public, max-age=31536000, immutable'});
       task.on('state_changed',
         function(snap){
           const pct=Math.round(snap.bytesTransferred/snap.totalBytes*100);
