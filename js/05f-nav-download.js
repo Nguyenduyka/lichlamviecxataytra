@@ -198,7 +198,7 @@ function doPrint(){
     +'<td style="width:50%;text-align:center;border:none;font-family:Times New Roman;font-size:10pt"><b>UỶ BAN NHÂN DÂN</b><br><b><u>'+(_org.tenNgan||_org.tenCoQuan).toUpperCase()+'</u></b></td>'
     +'<td style="width:50%;text-align:center;border:none;font-family:Times New Roman;font-size:10pt"><b>CỘNG HOÀ XÃ HỘI CHỦ NGHĨA VIỆT NAM</b><br><b><u>Độc lập - Tự do - Hạnh phúc</u></b><br><i>'+ngayKy+'</i></td>'
     +'</tr></table>'
-    +'<p style="text-align:center;font-size:13pt;font-weight:bold;font-family:Times New Roman;margin:4pt 0 2pt">LỊCH LÀM VIỆC CỦA UỶ BAN NHÂN DÂN XÃ TÂY TRÀ BỒNG</p>'
+    +'<p style="text-align:center;font-size:13pt;font-weight:bold;font-family:Times New Roman;margin:4pt 0 2pt">LỊCH LÀM VIỆC CỦA UỶ BAN NHÂN DÂN XÃ TÂY TRÀ</p>'
     +'<p style="text-align:center;font-size:9.5pt;font-style:italic;font-family:Times New Roman;margin:0 0 6pt">(Tuần '+wn+': Từ ngày '+fmtVi(ws)+' đến ngày '+fmtVi(we)+')</p>'
     +'<table style="width:100%;border-collapse:collapse">'
     +'<colgroup><col style="width:8%"><col style="width:7%"><col style="width:27%"><col style="width:14%"><col style="width:14%"><col style="width:15%"><col style="width:15%"></colgroup>'
