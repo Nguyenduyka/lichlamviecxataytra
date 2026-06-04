@@ -152,18 +152,36 @@ function handleImportFile(inp){
   }
 }
 
-function doImport(){
+async function doImport(){
   if(!_importData||!_importData.length)return;
+  const pv=document.getElementById('importPreview');
+  // Phải đăng nhập admin (có currentUID) thì save() mới ghi lên máy chủ
+  if(typeof currentUID==='undefined' || !currentUID){
+    if(pv){pv.style.display='block';pv.innerHTML='❌ Chưa đăng nhập quản trị nên không lưu được. Hãy đăng nhập admin rồi Import lại.';}
+    return;
+  }
   const merge=document.getElementById('importMerge').value;
+  // Chuẩn hóa: đảm bảo đủ field như lịch tạo tay (tránh thiếu field gây lỗi)
+  const norm=(e,id)=>Object.assign(
+    {title:'',date:'',ses:'sang',cat:'kh',time:'',location:'',chair:'',member:'',prep:'',note:'',files:[],hoan:0,isNew:0},
+    e,{id:id});
   if(merge==='replace'){
     if(!confirm('⚠️ Xoá toàn bộ lịch hiện tại và thay bằng dữ liệu mới?'))return;
-    events=_importData.map((e,i)=>({...e,id:i+1}));
+    events=_importData.map((e,i)=>norm(e,i+1));
   } else {
     let maxId=0;for(const e of events){const n=parseInt(e.id)||0;if(n>maxId)maxId=n;}
-    events=[...events,..._importData.map((e,i)=>({...e,id:maxId+i+1}))];
+    events=[...events,..._importData.map((e,i)=>norm(e,maxId+i+1))];
   }
-  save();renderAllNoFetch();
-  document.getElementById('ovImport').classList.remove('open');
+  const n=_importData.length;
+  if(pv){pv.style.display='block';pv.innerHTML='⏳ Đang lưu '+n+' lịch lên máy chủ...';}
+  try{ const r=save(); if(r&&typeof r.then==='function') await r; }catch(err){}
+  renderAllNoFetch();
+  if(typeof _lastSaveError!=='undefined' && _lastSaveError){
+    if(pv)pv.innerHTML='❌ Lưu lên máy chủ thất bại: '+_lastSaveError+'. Dữ liệu CHƯA được ghi.';
+    return; // giữ hộp thoại mở để bạn thấy lỗi
+  }
+  if(pv)pv.innerHTML='✅ Đã nhập & lưu '+n+' lịch lên máy chủ.';
+  setTimeout(function(){var ov=document.getElementById('ovImport');if(ov)ov.classList.remove('open');},1000);
   _importData=null;
 }
 
