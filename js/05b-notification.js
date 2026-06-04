@@ -545,7 +545,7 @@ function _updateMobNotifBadge(n){
 // Gửi FCM push đến tất cả thiết bị đã đăng ký token
 // URL Google Apps Script để gửi push notification
 // Điền URL sau khi deploy GAS: https://script.google.com/macros/s/XXXX/exec
-const GAS_PUSH_URL = 'https://script.google.com/macros/s/AKfycbzMIC_ObHgm-7ljU9ewolJeP5UtgYy4GTEk1IOONHznIUbtJhmCPplTc_ClHr7O48p6zQ/exec';
+const GAS_PUSH_URL = 'https://script.google.com/macros/s/AKfycbyLIRstjljKhMDYEcIGtYjf3OmjSwdJz6fN-wOIWAV3jncKz-cWqp3sffC64LL1vcol5A/exec';
 
 async function sendFCMPush(count, msg, evId, evDate) {
   log('[Push] sendFCMPush called:', {count, msg: msg?.slice(0,50), evId});
