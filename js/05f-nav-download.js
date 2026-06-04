@@ -65,6 +65,28 @@ function importLich(){
 }
 
 let _importData=null;
+let _importIssues=[];
+// Bảng kết quả import: số lịch hợp lệ + danh sách dòng cần sửa trong file
+function _importResultHtml(parsed, issues, saved){
+  const E=(typeof esc==='function')?esc:(x=>x);
+  const d2v=s=>{const p=String(s).split('-');return p.length===3?(p[2]+'/'+p[1]+'/'+p[0]):s;};
+  const n=parsed.length;
+  const ds=parsed.map(e=>e.date).filter(Boolean).sort();
+  const range=ds.length?(' • Từ '+d2v(ds[0])+' đến '+d2v(ds[ds.length-1])):'';
+  let head;
+  if(n===0) head='<div style="color:#c0392b;font-weight:700">❌ Không đọc được lịch nào hợp lệ.</div>';
+  else if(saved) head='<div style="color:#127a3e;font-weight:700">✅ Đã nhập & lưu '+n+' lịch lên máy chủ.'+range+'</div>';
+  else head='<div style="color:#127a3e;font-weight:700">✅ Đọc được '+n+' lịch hợp lệ.'+range+'</div>';
+  let warn='';
+  if(issues&&issues.length){
+    const lis=issues.slice(0,12).map(s=>'<li>'+E(s)+'</li>').join('');
+    const more=issues.length>12?('<li>… và '+(issues.length-12)+' dòng khác</li>'):'';
+    warn='<div style="margin-top:8px;color:#9a6700"><b>⚠️ '+issues.length+' dòng cần kiểm tra/sửa trong file:</b>'
+        +'<ul style="margin:6px 0 0;padding-left:18px;max-height:160px;overflow:auto;line-height:1.5">'+lis+more+'</ul></div>';
+  }
+  const tip=(n===0)?'<div style="margin-top:8px;color:#666;font-size:11px">Kiểm tra: cột <b>Ngày</b> dạng dd/mm/yyyy, cột <b>Buổi</b> là Sáng/Chiều/Tối, cột <b>Nội dung</b> không để trống.</div>':'';
+  return head+warn+tip;
+}
 function handleImportFile(inp){
   const file=(inp.files||[])[0];if(!file)return;
   const preview=document.getElementById('importPreview');
@@ -96,25 +118,32 @@ function handleImportFile(inp){
         const wb=XLSX.read(e.target.result,{type:'array',cellDates:true});
         const ws=wb.Sheets[wb.SheetNames[0]];
         const rows=XLSX.utils.sheet_to_json(ws,{header:1,defval:null,raw:false});
-        const parsed=[];let curDate='',curSes='sang';const idBase=Date.now();
+        const parsed=[];const issues=[];let curDate='',curSes='sang';const idBase=Date.now();
         for(let i=1;i<rows.length;i++){
-          const r=rows[i];
+          const r=rows[i]||[];
+          const xl=i+1; // số dòng thật trên Excel
           const c0=r[0]?String(r[0]).trim():'';
           const c1=r[1]?String(r[1]).trim():'';
           const c2=r[2]?String(r[2]).trim():'';
-          if(c0&&(c0.includes('Thứ')||c0.includes('Chủ nhật'))){
-            for(let k=i+1;k<=i+2&&k<rows.length;k++){
-              const d=rows[k][0]?String(rows[k][0]).trim():'';
-              const mp=d.match(/(\d{1,2})\/(\d{1,2})\/(\d{4})/);
-              if(mp){curDate=mp[3]+'-'+mp[1].padStart(2,'0')+'-'+mp[2].padStart(2,'0');break;}
-              const mi=d.match(/(\d{4})-(\d{2})-(\d{2})/);
-              if(mi){curDate=mi[0].substring(0,10);break;}
-            }
+          // Ngày lấy trực tiếp từ cột Ngày (cột A) của dòng — ƯU TIÊN dd/mm/yyyy.
+          const _md=c0.match(/(\d{1,2})\/(\d{1,2})\/(\d{4})/);
+          if(_md){
+            const dd=+_md[1],mm=+_md[2];
+            if(dd<1||dd>31||mm<1||mm>12){ issues.push('Dòng '+xl+': ngày "'+c0+'" không hợp lệ (ngày 1–31, tháng 1–12).'); }
+            else curDate=_md[3]+'-'+_md[2].padStart(2,'0')+'-'+_md[1].padStart(2,'0');
+          } else {
+            const _mi=c0.match(/(\d{4})-(\d{2})-(\d{2})/);
+            if(_mi) curDate=_mi[0].substring(0,10);
+            else if(c0 && /\d/.test(c0) && /[\/\-]/.test(c0) && !c0.includes('Thứ') && c0.toLowerCase().indexOf('chủ nhật')<0)
+              issues.push('Dòng '+xl+': ngày "'+c0+'" sai định dạng, cần dd/mm/yyyy (vd 09/06/2026).');
           }
-          if(c1==='Sáng')curSes='sang';
-          else if(c1==='Chiều')curSes='chieu';
-          else if(c1==='Tối')curSes='toi';
+          let sesSet=false;
+          if(c1==='Sáng'){curSes='sang';sesSet=true;}
+          else if(c1==='Chiều'){curSes='chieu';sesSet=true;}
+          else if(c1==='Tối'){curSes='toi';sesSet=true;}
           if(!c2||c2==='NỘI DUNG'||c2.toLowerCase()==='nghỉ')continue;
+          if(c1 && !sesSet) issues.push('Dòng '+xl+': buổi "'+c1+'" không hợp lệ — chỉ nhận Sáng/Chiều/Tối.');
+          if(!curDate){ issues.push('Dòng '+xl+': có nội dung nhưng phía trên chưa có Ngày → bị bỏ qua.'); continue; }
           let title=c2.replace(/^[-–•]\s*/,'').trim();
           let location=r[4]?String(r[4]).trim():'';
           let chair=r[3]?String(r[3]).trim():'';
@@ -122,8 +151,8 @@ function handleImportFile(inp){
           let prep=r[6]?String(r[6]).trim():'';
           let j=i+1;
           while(j<rows.length){
-            const nr=rows[j];
-            if((nr[0]&&String(nr[0]).includes('Thứ'))||nr[1]||nr[2])break;
+            const nr=rows[j]||[];
+            if((nr[0]&&String(nr[0]).match(/\d|Thứ/))||nr[1]||nr[2])break;
             if(nr[4])location=(location+' '+String(nr[4])).trim();
             if(nr[3])chair=(chair+' '+String(nr[3])).trim();
             if(nr[5])member=(member+' '+String(nr[5])).trim();
@@ -139,13 +168,11 @@ function handleImportFile(inp){
           else if(/kiểm tra|nghiệm thu/.test(low))cat='kt';
           else if(/tiếp công dân/.test(low))cat='nd';
           else if(/làm việc|lãnh đạo/.test(low))cat='ldao';
-          if(!curDate)continue;
           parsed.push({id:idBase+parsed.length,title,date:curDate,ses:curSes,cat,time,location,chair,member,prep,note:'',files:[]});
         }
-        if(parsed.length===0)throw new Error('Không đọc được dữ liệu. Kiểm tra cấu trúc file.');
-        _importData=parsed;
-        preview.innerHTML='✅ <b>Đọc được '+parsed.length+' lịch</b> từ file Excel';
-        btnDo.style.display='';
+        _importData=parsed; _importIssues=issues;
+        preview.innerHTML=_importResultHtml(parsed,issues,false);
+        btnDo.style.display = parsed.length ? '' : 'none';
       }catch(err){preview.innerHTML='❌ '+err.message;btnDo.style.display='none';}
     };
     reader.readAsArrayBuffer(file);
@@ -172,7 +199,7 @@ async function doImport(){
     let maxId=0;for(const e of events){const n=parseInt(e.id)||0;if(n>maxId)maxId=n;}
     events=[...events,..._importData.map((e,i)=>norm(e,maxId+i+1))];
   }
-  const n=_importData.length;
+  const n=_importData.length; const savedData=_importData.slice();
   if(pv){pv.style.display='block';pv.innerHTML='⏳ Đang lưu '+n+' lịch lên máy chủ...';}
   try{ const r=save(); if(r&&typeof r.then==='function') await r; }catch(err){}
   renderAllNoFetch();
@@ -180,8 +207,10 @@ async function doImport(){
     if(pv)pv.innerHTML='❌ Lưu lên máy chủ thất bại: '+_lastSaveError+'. Dữ liệu CHƯA được ghi.';
     return; // giữ hộp thoại mở để bạn thấy lỗi
   }
-  if(pv)pv.innerHTML='✅ Đã nhập & lưu '+n+' lịch lên máy chủ.';
-  setTimeout(function(){var ov=document.getElementById('ovImport');if(ov)ov.classList.remove('open');},1000);
+  if(pv)pv.innerHTML=_importResultHtml(savedData,_importIssues,true);
+  if(!(_importIssues&&_importIssues.length)){
+    setTimeout(function(){var ov=document.getElementById('ovImport');if(ov)ov.classList.remove('open');},1500);
+  }
   _importData=null;
 }
 
