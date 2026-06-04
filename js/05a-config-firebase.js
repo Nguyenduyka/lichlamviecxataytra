@@ -18,11 +18,11 @@ const ORG_CONFIG = {
   tenCoQuan:      'UBND XÃ TÂY TRÀ',
   tenNgan:        'Xã Tây Trà',
   capCoQuan:      'HỆ THỐNG QUẢN LÝ LỊCH LÀM VIỆC SỐ',
-  nguoiPhuTrach:  'Nguyễn Duy Ka',
-  chucVu:         'Phòng Kinh tế xã Tây Trà Bồng',
+  nguoiPhuTrach:  'Hồ Phúc Long',
+  chucVu:         'Chánh Văn phòng HĐND và UBND xã',
   donVi:          'xã Tây Trà',
   diaDanh:        'Tây Trà',
-  soDienThoai:    '0917.921.999',
+  soDienThoai:    '0398.704.755',
   viTri:          { lat: 15.105, lon: 108.45 },
   mauChinh:       '#c0392b',
   mauPhu:         '#8c1812',
@@ -31,14 +31,14 @@ const ORG_CONFIG = {
 
 // ── Mẫu config cho Đảng ủy (copy vào ORG_CONFIG khi dùng cho Đảng ủy) ──
 // const ORG_CONFIG = {
-//   tenCoQuan:     'Đảng ủy xã Tây Trà',
-//   tenNgan:       'Đảng ủy xã Tây Trà',
+//   tenCoQuan:     'Đảng ủy Xã Tây Trà Bồng',
+//   tenNgan:       'Đảng ủy Xã Tây Trà Bồng',
 //   capCoQuan:     'Đảng ủy',
-//   nguoiPhuTrach: 'Nguyễn Duy Ka',
+//   nguoiPhuTrach: 'Ông Hồ Phúc Long',
 //   chucVu:        'Chuyên viên',
-//   donVi:         'xã Tây Trà',
-//   diaDanh:       'Tây Trà',
-//   soDienThoai:   '0917.921.999',
+//   donVi:         'xã Tây Trà Bồng',
+//   diaDanh:       'Tây Trà Bồng',
+//   soDienThoai:   '0398.704.755',
 //   viTri:         { lat: 15.07, lon: 108.53 },
 //   mauChinh:      '#c0392b',
 //   mauPhu:        '#8c1812',
@@ -239,7 +239,7 @@ async function _saveOSPlayerId(OneSignal) {
 
 
 // ════════════════════════════════════════
-// FIREBASE — Tây Trà
+// FIREBASE — Tây Trà Bồng
 // Viewer: đọc thẳng donvi/{uid}/events (rules .read=true)
 // Admin: đọc/ghi sau khi đăng nhập
 // ════════════════════════════════════════
