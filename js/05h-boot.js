@@ -157,11 +157,11 @@ function trackVisit(){
     }
 
     // Deep-link từ push mở bằng URL (?d=YYYY-MM-DD&ev=<id>) → nhảy đến sự kiện
+    // CHỈ lưu lại; xử lý SAU khi đã render (DOM mới có card ngày) ở cuối hàm boot.
     try{
       var _dl_d = _params.get('d') || _params.get('date');
       var _dl_ev = _params.get('ev') || _params.get('evId');
       if(_dl_d){ window._pendingDeepLink = { date: _dl_d, evId: _dl_ev }; }
-      if(typeof _processDeepLink==='function') _processDeepLink();
     }catch(_){}
 
     // Bước 3: Chờ weather xong (tối đa 8s, đã chạy song song nên thường đã có)
@@ -181,8 +181,10 @@ function trackVisit(){
       startTV();
       try{bc.postMessage({type:'tvOn'});}catch(e){}
     } else {
-      renderAllNoFetch();
+      await renderAllNoFetch();
     }
+    // Xử lý deep-link SAU khi đã render (DOM đã có card ngày) — sửa lỗi không nhảy đúng lịch
+    try{ if(window._pendingDeepLink && typeof _processDeepLink==='function'){ setTimeout(_processDeepLink, 300); } }catch(_){}
     trackVisit();
     log('[Boot] done, events='+events.length);
   }catch(err){
