@@ -4,6 +4,25 @@
 // ════════════════════════════════════════
 function nav(dir){wkOff+=dir;wxData=null;wxFetchedAt=0;renderAll();}
 function goToday(){wkOff=0;wxData=null;wxFetchedAt=0;renderAll();}
+// Lazy-load thư viện SheetJS (XLSX) — chỉ tải khi cần đọc/xuất Excel, tránh nặng trang.
+function _ensureXlsx(cb){
+  if(typeof XLSX!=='undefined'){cb();return;}
+  if(window._xlsxLoading){
+    var t=setInterval(function(){ if(typeof XLSX!=='undefined'){clearInterval(t);cb();} },200);
+    return;
+  }
+  window._xlsxLoading=true;
+  var s=document.createElement('script');
+  s.src='https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js';
+  s.onload=function(){ window._xlsxLoading=false; cb(); };
+  s.onerror=function(){
+    window._xlsxLoading=false;
+    var p=document.getElementById('importPreview');
+    if(p){p.style.display='block';p.innerHTML='❌ Không tải được thư viện Excel. Kiểm tra kết nối mạng rồi thử lại.';}
+  };
+  document.head.appendChild(s);
+}
+
 function importLich(){
   const existing=document.getElementById('ovImport');
   if(existing){existing.classList.add('open');return;}
@@ -68,8 +87,12 @@ function handleImportFile(inp){
   } else {
     reader.onload=e=>{
       try{
-        if(typeof XLSX==='undefined')throw new Error('Thư viện XLSX chưa tải. Kiểm tra kết nối mạng.');
-        if(typeof XLSX==='undefined'){_ensureXlsx(()=>reader.onload(e));return;}
+        if(typeof XLSX==='undefined'){
+          var _pv=document.getElementById('importPreview');
+          if(_pv){_pv.style.display='block';_pv.innerHTML='⏳ Đang tải thư viện đọc Excel, vui lòng đợi...';}
+          _ensureXlsx(function(){ reader.onload(e); });
+          return;
+        }
         const wb=XLSX.read(e.target.result,{type:'array',cellDates:true});
         const ws=wb.Sheets[wb.SheetNames[0]];
         const rows=XLSX.utils.sheet_to_json(ws,{header:1,defval:null,raw:false});
