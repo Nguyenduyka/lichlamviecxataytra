@@ -16,7 +16,7 @@
 importScripts('https://cdn.onesignal.com/sdks/web/v16/OneSignalSDK.sw.js');
 
 // ── CACHE ──────────────────────────────────────
-const CACHE_NAME = 'llv-xa-tay-tra-v7';
+const CACHE_NAME = 'llv-xa-tay-tra-v8';
 
 // Precache tài nguyên cốt lõi cần NGAY khi mở app, kể cả mạng kém/đổi version.
 // QUAN TRỌNG: precache cả CSS — nếu không, sau khi đổi CACHE_NAME (xóa cache cũ)
