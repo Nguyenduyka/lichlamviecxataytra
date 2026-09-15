@@ -114,31 +114,14 @@ function setTitleBadge(count){
 }
 
 // 4. Badge đỏ trong giao diện
+// TRƯỚC ĐÂY: tạo 1 chấm đỏ nổi cố định (position:fixed top:12px;right:12px)
+// đè ngay lên góc phải màn hình — đúng chỗ ô thời tiết trong header, gây rối
+// giao diện. Giờ đã có nút chuông riêng (#hdrNotifBell) nằm cạnh ô thời tiết
+// với badge số gắn liền vào chuông, nên bỏ hẳn badge nổi kiểu cũ này.
 function setUiBadge(count){
-  // Badge góc phải chỉ hiện trên desktop — mobile dùng badge trên nav chuông
-  let badge=document.getElementById('notifBadge');
-  if(!badge){
-    badge=document.createElement('div');
-    badge.id='notifBadge';
-    badge.style.cssText='position:fixed;top:12px;right:12px;z-index:9998;background:#c0392b;color:#fff;font-size:11px;font-weight:900;font-family:\'Be Vietnam Pro\',sans-serif;min-width:20px;height:20px;border-radius:10px;display:none;align-items:center;justify-content:center;padding:0 5px;box-shadow:0 2px 8px rgba(192,57,43,.5);cursor:pointer;border:2px solid #fff;animation:badgePop .3s ease;';
-    badge.title='Có lịch mới được cập nhật';
-    badge.onclick=function(){clearNotif();};
-    if(!document.getElementById('badgeStyle')){
-      const s=document.createElement('style');
-      s.id='badgeStyle';
-      s.textContent='@keyframes badgePop{from{transform:scale(0)}to{transform:scale(1)}}'+
-        '@media(max-width:600px){#notifBadge{display:none!important}}';
-      document.head.appendChild(s);
-    }
-    document.body.appendChild(badge);
-  }
-  if(count>0){
-    badge.textContent=count>9?'9+':String(count);
-    // Chỉ hiện trên desktop
-    badge.style.display=window.innerWidth>600?'flex':'none';
-  } else {
-    badge.style.display='none';
-  }
+  // Dọn phần tử cũ nếu còn sót lại từ bản trước (cache/Service Worker cũ)
+  const old=document.getElementById('notifBadge');
+  if(old && old.parentNode) old.parentNode.removeChild(old);
 }
 
 // 5. Push notification
@@ -309,12 +292,28 @@ async function _scrollToDate(dateStr, evId){
   const target=new Date(dateStr+'T00:00:00');
   if(isNaN(target.getTime())) return;
   const todayWk=wkStart(0);
-  const diffWk=Math.round((target-todayWk)/(7*24*3600*1000));
+  // QUAN TRỌNG: phải tính hiệu số tuần dựa trên NGÀY THỨ HAI của tuần chứa
+  // target, KHÔNG dùng trực tiếp ngày target. Nếu dùng ngày target thô, các
+  // sự kiện rơi vào Thứ 5/6/7/CN của tuần hiện tại (lệch 4-6 ngày so với Thứ
+  // Hai) sẽ bị Math.round() làm tròn LÊN thành tuần kế tiếp một cách sai lệch
+  // → bấm thông báo không nhảy đến đúng tuần/vị trí (đặc biệt rõ khi đang
+  // xem các tuần sau tuần hiện tại, vì lệch tuần cộng dồn sai luôn theo).
+  const targetWk=new Date(target);
+  const _dow=targetWk.getDay(); // 0=CN..6=T7
+  targetWk.setDate(targetWk.getDate()-(_dow===0?6:_dow-1));
+  targetWk.setHours(0,0,0,0);
+  const diffWk=Math.round((targetWk-todayWk)/(7*24*3600*1000));
 
   // Nếu khác tuần → chuyển tuần và chờ render xong
   if(diffWk!==wkOff){
     _npScrollDate=null; _npScrollEvId=null;
     wkOff=diffWk;
+    // FIX: renderAllNoFetch() không tự fetch thời tiết — nếu wxData chưa có
+    // (hoặc tuần đích ngoài phạm vi cache), bảng thời tiết sẽ hiện "Không có
+    // dự báo". Đảm bảo có dữ liệu thời tiết trước khi vẽ lại tuần mới.
+    if(!wxData && typeof fetchWx==='function'){
+      try{ wxData = await fetchWx(); wxFetchedAt = Date.now(); }catch(e){}
+    }
     await renderAllNoFetch();
     // Chờ thêm để đảm bảo DOM đã paint xong sau khi đổi tuần
     await new Promise(r=>setTimeout(r,120));
@@ -376,7 +375,15 @@ async function _scrollToDate(dateStr, evId){
           tblInner.scrollTop=tblInner.scrollTop+(eTop-innerTop)-60;
           evEl2.classList.add('hl');
           setTimeout(function(){evEl2.classList.remove('hl');},5000);
+        } else {
+          // Không tìm thấy đúng dòng lịch (VD: id đổi) → vẫn nhấp nháy cả ngày để user thấy vị trí
+          row.classList.add('hl');
+          setTimeout(function(){row.classList.remove('hl');},5000);
         }
+      } else {
+        // Không có evId cụ thể → nhấp nháy nguyên ngày để dễ nhận biết
+        row.classList.add('hl');
+        setTimeout(function(){row.classList.remove('hl');},5000);
       }
     }
   }
@@ -412,13 +419,41 @@ function openNotifPanel(){
   if(typeof _syncAllBadges==='function') _syncAllBadges();
   _renderNotifPanel();
   if(typeof _syncAllBadges==='function') _syncAllBadges();
-  document.getElementById('notifPanel').classList.add('open');
-  document.getElementById('npOverlay').classList.add('open');
+
+  const panel=document.getElementById('notifPanel');
+  const overlay=document.getElementById('npOverlay');
+  const bell=document.getElementById('hdrNotifBell');
+  const isDesktop=window.innerWidth>600 && bell && bell.offsetParent!==null; // offsetParent null nếu bell đang display:none (đã ẩn ở màn hình hẹp/ngang)
+
+  if(isDesktop){
+    // Đo kích thước THẬT của panel rồi định vị theo toạ độ trái (left), có
+    // giới hạn (clamp) để panel luôn nằm ngay dưới chuông và không bao giờ
+    // tràn ra ngoài màn hình dù chuông ở vị trí nào trong header.
+    panel.style.visibility='hidden';
+    panel.style.right='auto';
+    panel.classList.add('open');
+    requestAnimationFrame(function(){
+      const r=bell.getBoundingClientRect();
+      const pw=panel.offsetWidth||380;
+      const margin=10;
+      let left=r.right-pw; // mặc định: căn mép phải panel trùng mép phải chuông
+      left=Math.max(margin, Math.min(left, window.innerWidth-pw-margin));
+      panel.style.top=(r.bottom+8)+'px';
+      panel.style.left=left+'px';
+      panel.style.visibility='visible';
+      bell.classList.add('open');
+    });
+  } else {
+    panel.classList.add('open');
+  }
+  overlay.classList.add('open');
 }
 
 function closeNotifPanel(){
   document.getElementById('notifPanel').classList.remove('open');
   document.getElementById('npOverlay').classList.remove('open');
+  const bell=document.getElementById('hdrNotifBell');
+  if(bell) bell.classList.remove('open');
 }
 
 function clearNotifPanel(){
@@ -482,8 +517,9 @@ function _npItemClick(el){
   const date=el.getAttribute('data-date');
   const evId=el.getAttribute('data-evid');
   const ts=parseInt(el.getAttribute('data-ts')||'0');
+  const npItem=_npMsgLog.find(x=>x.ts===ts)||{msg:el.querySelector('.np-ev-title')?el.querySelector('.np-ev-title').textContent:'',date,evId:evId?parseInt(evId):null};
 
-  // Xóa khỏi log NGAY (trước khi scroll/close) để badge luôn chính xác
+  // Xóa khỏi log NGAY (trước khi mở modal/scroll) để badge luôn chính xác
   if(ts){
     // Đánh dấu ts này đã được user xem/xóa → openNotifPanel sẽ không rebuild lại
     _markSeenNew(ts);
@@ -506,11 +542,20 @@ function _npItemClick(el){
     else _updateMobNotifBadge(_npMsgLog.length);
   },220);
 
+  // Trên DESKTOP: mở modal xem chi tiết lịch (kèm tải giấy mời nếu có),
+  // KHÔNG cuộn đến vị trí tuần nữa — người dùng chỉ cần xem/tải, không cần
+  // rời khỏi tuần đang xem.
+  const isMobile=window.innerWidth<=600;
+  if(!isMobile){
+    closeNotifPanel();
+    _openNpDetail(date, evId?parseInt(evId):null, npItem);
+    return;
+  }
+
   // Nếu date null — thử tìm từ events theo ts hoặc title
   if(!date){
     let matched=events.find(e=>e.isNew&&Math.abs(e.isNew-ts)<30000);
     if(!matched){
-      const npItem=_npMsgLog.find(x=>x.ts===ts)||{};
       const msg=npItem.msg||'';
       if(msg){
         const msgLow=msg.toLowerCase();
@@ -531,15 +576,102 @@ function _npItemClick(el){
     return;
   }
 
-  // Navigate đến đúng ngày/lịch
+  // Navigate đến đúng ngày/lịch (mobile)
   _scrollToDate(date, evId?parseInt(evId):null);
 }
 
+// ── Modal xem chi tiết lịch từ thông báo (desktop) ──────────────
+function _openNpDetail(date, evId, npItem){
+  const ov=document.getElementById('ovNpDetail');
+  const body=document.getElementById('npdBody');
+  const hdr=document.getElementById('npdHdrTitle');
+  if(!ov||!body) return;
+
+  // Tìm sự kiện thật trong events theo id (ưu tiên), rồi theo ngày+tiêu đề
+  let ev=null;
+  if(evId!=null) ev=events.find(e=>e.id==evId);
+  if(!ev && date){
+    const msg=(npItem&&npItem.msg)||'';
+    const msgLow=msg.toLowerCase();
+    ev=events.find(e=>e.date===date && e.title && msgLow.includes(e.title.toLowerCase()));
+  }
+
+  if(ev){
+    // ── Lịch vẫn còn tồn tại → hiện đầy đủ thông tin ──
+    const cat=catOf(ev);
+    hdr.innerHTML='📅 Chi tiết lịch';
+    const d=new Date(ev.date+'T00:00:00');
+    const dStr=d.toLocaleDateString('vi-VN',{weekday:'long',day:'2-digit',month:'2-digit',year:'numeric'});
+    const sesLabel={sang:'☀️ Sáng',chieu:'🌤 Chiều',toi:'🌙 Tối'}[ev.ses]||'';
+    const hoan=isHoan(ev);
+    const files=(ev.files||[]);
+    const filesHtml=files.length?`
+      <div style="display:flex;flex-direction:column;gap:6px;margin-top:2px">
+        ${files.map((f,fi)=>`
+          <button type="button" onclick="openFile(events.find(x=>x.id==${ev.id}).files[${fi}])" style="display:flex;align-items:center;gap:8px;padding:9px 12px;border-radius:9px;border:1.5px solid ${fBorder(f.type)};background:${fBg(f.type)};color:${fColor(f.type)};font-size:12.5px;font-weight:700;cursor:pointer;font-family:'Be Vietnam Pro',sans-serif;text-align:left;width:100%">
+            <span style="font-size:16px">${fIcon(f.type)}</span>
+            <span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(f.name||'File đính kèm')}</span>
+            <span style="font-size:10px;font-weight:800;opacity:.85">⬇ Tải về</span>
+          </button>`).join('')}
+      </div>`:'';
+    body.innerHTML=`
+      <div style="display:flex;align-items:flex-start;gap:10px">
+        <div style="width:38px;height:38px;border-radius:10px;background:${cat.color}18;border:1.5px solid ${cat.color}40;display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0">${cat.icon}</div>
+        <div style="flex:1;min-width:0">
+          <div style="font-size:15px;font-weight:800;color:#1a1a1a;line-height:1.35">${esc(ev.title)}${hoan?' <span class="ev-hoan-badge">⏸ Hoãn</span>':''}</div>
+          <div style="font-size:11.5px;color:${cat.color};font-weight:700;margin-top:2px">${esc(cat.label)}</div>
+        </div>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:8px;padding:12px;background:#faf8f5;border-radius:10px;border:1px solid #f0ede8">
+        <div style="font-size:12.5px;color:#333"><b>🗓 Ngày:</b> ${dStr}</div>
+        <div style="font-size:12.5px;color:#333"><b>${sesLabel}</b>${ev.time?' · 🕐 '+esc(ev.time):''}</div>
+        ${ev.location?`<div style="font-size:12.5px;color:#333">📍 ${esc(ev.location)}</div>`:''}
+        ${ev.chair?`<div style="font-size:12.5px;color:#333"><b>Chủ trì:</b> ${esc(ev.chair)}</div>`:''}
+        ${ev.member?`<div style="font-size:12.5px;color:#333"><b>Thành phần:</b> ${esc(ev.member)}</div>`:''}
+        ${ev.prep?`<div style="font-size:12.5px;color:#333"><b>Chuẩn bị:</b> ${esc(ev.prep)}</div>`:''}
+      </div>
+      ${filesHtml||`<div style="font-size:11.5px;color:var(--muted);font-style:italic">Không có file đính kèm (giấy mời).</div>`}
+    `;
+  } else {
+    // ── Lịch không còn tồn tại (đã bị xoá) → thông báo nhẹ nhàng, giữ lại
+    //    thông tin đã biết từ tin nhắn thông báo để người dùng vẫn hiểu ngữ
+    //    cảnh, thay vì màn hình trống khó hiểu.
+    hdr.innerHTML='📅 Chi tiết lịch';
+    const meta=_getMsgMeta(npItem&&npItem.msg);
+    const shortMsg=esc(_truncMsg((npItem&&npItem.msg)||'').replace(/^[^:]+:\s*/,''));
+    const dateLine=date?new Date(date+'T00:00:00').toLocaleDateString('vi-VN',{weekday:'long',day:'2-digit',month:'2-digit',year:'numeric'}):'';
+    body.innerHTML=`
+      <div style="display:flex;flex-direction:column;align-items:center;text-align:center;gap:10px;padding:18px 8px">
+        <div style="width:52px;height:52px;border-radius:50%;background:#fdf0ef;display:flex;align-items:center;justify-content:center;font-size:26px">🗑️</div>
+        <div style="font-size:14px;font-weight:800;color:#1a1a1a">Lịch này đã bị xoá</div>
+        <div style="font-size:12.5px;color:var(--muted);line-height:1.5">
+          ${shortMsg?esc(shortMsg):'Nội dung lịch không còn tồn tại trong hệ thống.'}
+          ${dateLine?'<br>Ngày dự kiến: '+dateLine:''}
+        </div>
+        <div style="font-size:11px;color:var(--muted);font-style:italic;margin-top:2px">Có thể lịch đã được xoá hoặc thay đổi bởi quản trị viên.</div>
+      </div>
+    `;
+  }
+  ov.classList.add('open');
+}
+function closeNpDetail(){
+  const ov=document.getElementById('ovNpDetail');
+  if(ov) ov.classList.remove('open');
+}
+
 function _updateMobNotifBadge(n){
+  // Badge trên nút chuông mobile (nav dưới)
   const b=document.getElementById('mobNotifBadge');
-  if(!b) return;
-  if(n>0){b.textContent=n>9?'9+':String(n);b.classList.add('show');}
-  else b.classList.remove('show');
+  if(b){
+    if(n>0){b.textContent=n>9?'9+':String(n);b.classList.add('show');}
+    else b.classList.remove('show');
+  }
+  // Badge trên nút chuông desktop (thanh nav trên) — cùng nguồn dữ liệu duy nhất
+  const bd=document.getElementById('desktopNotifBadge');
+  if(bd){
+    if(n>0){bd.textContent=n>9?'9+':String(n);bd.classList.add('show');}
+    else bd.classList.remove('show');
+  }
 }
 
 // Gửi FCM push đến tất cả thiết bị đã đăng ký token
