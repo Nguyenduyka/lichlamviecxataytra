@@ -180,6 +180,8 @@ function triggerNotif(count){
 // 7b. Đồng bộ TẤT CẢ badge từ một nguồn duy nhất: _npMsgLog.length
 function _syncAllBadges(){
   const n=_npMsgLog.length;
+  // Dọn badge nổi kiểu cũ (#notifBadge góc phải màn hình) nếu còn sót do cache
+  try{const _old=document.getElementById('notifBadge'); if(_old&&_old.parentNode) _old.parentNode.removeChild(_old);}catch(e){}
   // Badge nav chuông + số trong panel header
   if(typeof _updateMobNotifBadge==='function') _updateMobNotifBadge(n);
   // App icon badge = n (iOS home screen, PWA)
@@ -306,7 +308,14 @@ async function _scrollToDate(dateStr, evId){
 
   // Nếu khác tuần → chuyển tuần và chờ render xong
   if(diffWk!==wkOff){
-    _npScrollDate=null; _npScrollEvId=null;
+    // QUAN TRỌNG: phải GÁN (không phải xoá) 2 biến này trước khi render lại.
+    // renderMobileCards() kiểm tra "if(!_npScrollDate)" để quyết định có tự
+    // động cuộn về card "hôm nay" hay không sau khi vẽ lại tuần mới. Trước
+    // đây code lại xoá về null ngay tại đây, khiến điều kiện luôn đúng →
+    // MỌI lần đổi tuần từ thông báo đều bị tự cuộn giật về "hôm nay" trước,
+    // xung đột với việc cuộn đến đúng lịch của thông báo ngay sau đó (nhất
+    // là trên mobile khi đang không ở tuần hiện tại).
+    _npScrollDate=dateStr; _npScrollEvId=evId;
     wkOff=diffWk;
     // FIX: renderAllNoFetch() không tự fetch thời tiết — nếu wxData chưa có
     // (hoặc tuần đích ngoài phạm vi cache), bảng thời tiết sẽ hiện "Không có
@@ -358,6 +367,9 @@ async function _scrollToDate(dateStr, evId){
       card.style.boxShadow='0 0 0 5px rgba(192,57,43,.2)';
       setTimeout(function(){card.style.outline='';card.style.boxShadow='';},5000);
     }
+    // Đã cuộn xong theo thông báo → xoá cờ để các lần đổi tuần thông thường
+    // (bấm Trước/Tiếp) sau đó vẫn tự cuộn về "hôm nay" như bình thường.
+    _npScrollDate=null; _npScrollEvId=null;
   } else {
     // Desktop: scroll trong vs-tbl-inner
     var tblInner=document.getElementById('vsTblInner');
@@ -426,9 +438,10 @@ function openNotifPanel(){
   const isDesktop=window.innerWidth>600 && bell && bell.offsetParent!==null; // offsetParent null nếu bell đang display:none (đã ẩn ở màn hình hẹp/ngang)
 
   if(isDesktop){
-    // Đo kích thước THẬT của panel rồi định vị theo toạ độ trái (left), có
-    // giới hạn (clamp) để panel luôn nằm ngay dưới chuông và không bao giờ
-    // tràn ra ngoài màn hình dù chuông ở vị trí nào trong header.
+    // Panel xổ xuống ngay dưới chuông. Ưu tiên canh MÉP TRÁI panel trùng mép
+    // trái chuông (chuông nằm bên trái ô thời tiết nên mở về phía phải là
+    // thuận mắt nhất), sau đó kẹp lại để panel không tràn khỏi màn hình.
+    // Mũi tên được đặt đúng tâm chuông qua biến CSS --np-caret.
     panel.style.visibility='hidden';
     panel.style.right='auto';
     panel.classList.add('open');
@@ -436,10 +449,12 @@ function openNotifPanel(){
       const r=bell.getBoundingClientRect();
       const pw=panel.offsetWidth||380;
       const margin=10;
-      let left=r.right-pw; // mặc định: căn mép phải panel trùng mép phải chuông
+      let left=r.left;                       // canh mép trái panel với mép trái chuông
       left=Math.max(margin, Math.min(left, window.innerWidth-pw-margin));
-      panel.style.top=(r.bottom+8)+'px';
+      panel.style.top=(r.bottom+10)+'px';
       panel.style.left=left+'px';
+      const caret=Math.max(16, Math.min(pw-16, (r.left+r.width/2)-left));
+      panel.style.setProperty('--np-caret', caret+'px');
       panel.style.visibility='visible';
       bell.classList.add('open');
     });
@@ -544,7 +559,9 @@ function _npItemClick(el){
 
   // Trên DESKTOP: mở modal xem chi tiết lịch (kèm tải giấy mời nếu có),
   // KHÔNG cuộn đến vị trí tuần nữa — người dùng chỉ cần xem/tải, không cần
-  // rời khỏi tuần đang xem.
+  // rời khỏi tuần đang xem. Modal không phụ thuộc tuần/thời tiết nên luôn
+  // đúng dù thông báo thuộc tuần nào.
+  // Trên MOBILE: giữ nguyên hành vi cũ (cuộn đến đúng vị trí lịch trong tuần).
   const isMobile=window.innerWidth<=600;
   if(!isMobile){
     closeNotifPanel();
