@@ -4,7 +4,7 @@ name: Deploy to GitHub Pages
 # thêm. Nếu repo của bạn dùng nhánh khác (vd "master"), đổi tên bên dưới.
 on:
   push:
-    branches: [ main ]
+    branches: [ master ]
   workflow_dispatch:   # cho phép bấm "Run workflow" chạy tay khi cần
 
 permissions:
