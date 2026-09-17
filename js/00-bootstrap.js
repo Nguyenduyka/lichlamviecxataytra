@@ -9,6 +9,19 @@
   window.addEventListener('orientationchange',function(){setTimeout(setVH,200);});
 })();
 
+// Dọn ngay phần tử badge nổi kiểu cũ (#notifBadge, position:fixed đè lên góc
+// phải màn hình — đúng chỗ ô thời tiết) nếu trình duyệt còn giữ bản HTML/JS
+// cache cũ tạo ra nó trước khi bản vá mới kịp chạy. Chạy sớm nhất có thể,
+// không phụ thuộc vào lúc nào có thông báo mới.
+(function(){
+  function _cleanLegacyBadge(){
+    var old=document.getElementById('notifBadge');
+    if(old&&old.parentNode) old.parentNode.removeChild(old);
+  }
+  _cleanLegacyBadge();
+  document.addEventListener('DOMContentLoaded',_cleanLegacyBadge);
+})();
+
 // Áp dụng ORG_CONFIG vào title sau khi script load
 document.addEventListener('DOMContentLoaded',function(){
   if(typeof ORG_CONFIG==='undefined') return;
