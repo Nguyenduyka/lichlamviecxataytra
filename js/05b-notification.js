@@ -213,9 +213,9 @@ let _npScrollDate = null; // ngày cần scroll đến từ thông báo
 let _npScrollEvId = null; // id lịch cần highlight
 
 // ── Trạng thái hiệu ứng "rung + nhấp nháy" của chuông ──────────────────
-let _isNotifPanelOpen = false;
-let _bellSeenCount = 0;
-
+// Hiệu ứng chạy CHỪNG NÀO còn thông báo chưa đọc (n>0), kể cả khi panel
+// đang mở — mở panel KHÔNG làm dừng hiệu ứng. Chỉ dừng khi n về 0 (đã xem/
+// xoá hết từng thông báo, hoặc bấm "Đánh dấu đã đọc tất cả").
 function _setBellAlert(active){
   const b1=document.getElementById('hdrNotifBell');
   const b2=document.getElementById('mobNotifBtn');
@@ -223,19 +223,7 @@ function _setBellAlert(active){
 }
 
 function _updateBellAlertState(n){
-  if(_isNotifPanelOpen){
-    _setBellAlert(false);
-    _bellSeenCount = n;
-    return;
-  }
-  if(n<=0){
-    _setBellAlert(false);
-    _bellSeenCount = 0;
-    return;
-  }
-  if(n>_bellSeenCount){
-    _setBellAlert(true);
-  }
+  _setBellAlert(n>0);
 }
 (function(){
   try{_npMsgLog=JSON.parse(localStorage.getItem('llv_np_log')||'[]');}catch(e){_npMsgLog=[];}
@@ -436,8 +424,8 @@ async function _scrollToDate(dateStr, evId){
 }
 
 function openNotifPanel(){
-  _isNotifPanelOpen = true;
-  _setBellAlert(false);
+  // Mở panel KHÔNG tắt hiệu ứng — hiệu ứng chỉ dừng khi hết thông báo
+  // chưa đọc (n=0), xử lý tự động trong _updateBellAlertState().
   // Chặn scroll lan ra ngoài — gắn một lần
   const npList = document.getElementById('npList');
   if(npList && !npList._scrollLocked){
@@ -505,7 +493,6 @@ function closeNotifPanel(){
   document.getElementById('npOverlay').classList.remove('open');
   const bell=document.getElementById('hdrNotifBell');
   if(bell) bell.classList.remove('open');
-  _isNotifPanelOpen = false;
 }
 
 function clearNotifPanel(){
