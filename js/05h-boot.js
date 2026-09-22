@@ -35,15 +35,36 @@ function _onAppFocus(){
   if(typeof _openedViaNotif !== 'undefined' && _openedViaNotif){
     _openedViaNotif=false;
   }
+  // FIX: trên iOS, nếu app đang chạy nền (chưa bị tắt hẳn) và người dùng bấm
+  // vào thông báo đẩy, hệ điều hành thường chỉ ĐƯA APP RA FOREGROUND chứ
+  // KHÔNG tải lại trang — nghĩa là đoạn code đọc "?d=&ev=" từ URL lúc khởi
+  // động (chỉ chạy đúng 1 lần) sẽ không bao giờ chạy lại, nên bấm vào thông
+  // báo chỉ mở app lên mà không nhảy đến đúng lịch. Kiểm tra lại URL mỗi lần
+  // app được đưa ra foreground (hàm này được gọi từ visibilitychange, focus,
+  // pageshow) để bắt được các trường hợp đó.
+  _checkDeepLinkParams();
   // Không xóa badge khi mở app — badge chỉ xóa khi user scroll đến cuối danh sách
   // Đóng notification cũ trong notification center
-  if('serviceWorker' in navigator){
-    navigator.serviceWorker.ready.then(function(reg){
-      reg.getNotifications().then(function(notifs){
-        notifs.forEach(function(n){ n.close(); });
-      });
-    }).catch(function(){});
-  }
+    // LƯU Ý: đã bỏ đoạn tự động đóng TOÀN BỘ thông báo còn lại trong
+  // Notification Center mỗi khi app foreground — bấm thông báo nào chỉ xử
+  // lý đúng thông báo đó, không đụng đến các thông báo khác.
+}
+
+// Đọc "?d=/date=" và "?ev=/evId=" từ URL hiện tại và điều hướng nếu có.
+// Idempotent: sau khi xử lý thành công, _processDeepLink() tự xoá query
+// (history.replaceState) nên các lần gọi lại sau đó (mở app bình thường,
+// chuyển tab qua lại...) sẽ không tìm thấy gì và không làm gì cả — an toàn
+// để gọi lại nhiều lần.
+function _checkDeepLinkParams(){
+  try{
+    var _p=new URLSearchParams(window.location.search);
+    var _d=_p.get('d')||_p.get('date');
+    if(!_d) return;
+    var _ev=_p.get('ev')||_p.get('evId');
+    var _msg=_p.get('msg')||'';
+    window._pendingDeepLink={date:_d, evId:_ev, msg:_msg};
+    if(typeof _processDeepLink==='function') _processDeepLink();
+  }catch(_){}
 }
 
 // visibilitychange: khi app từ background → foreground
@@ -161,7 +182,8 @@ function trackVisit(){
     try{
       var _dl_d = _params.get('d') || _params.get('date');
       var _dl_ev = _params.get('ev') || _params.get('evId');
-      if(_dl_d){ window._pendingDeepLink = { date: _dl_d, evId: _dl_ev }; }
+      var _dl_msg = _params.get('msg') || '';
+      if(_dl_d){ window._pendingDeepLink = { date: _dl_d, evId: _dl_ev, msg: _dl_msg }; }
     }catch(_){}
 
     // Bước 3: Chờ weather xong (tối đa 8s, đã chạy song song nên thường đã có)

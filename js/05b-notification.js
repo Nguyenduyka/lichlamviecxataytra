@@ -292,13 +292,17 @@ function _processDeepLink(){
   try{
     if(!_pendingDeepLink) return;
     if(typeof events==='undefined' || !events || !events.length) return; // chờ dữ liệu
-    var d = _pendingDeepLink.date, ev = _pendingDeepLink.evId;
+    var d = _pendingDeepLink.date, ev = _pendingDeepLink.evId, msg = _pendingDeepLink.msg||'';
     _pendingDeepLink = null;
-    if(d){
-      _scrollToDate(d, ev ? parseInt(ev) : null);
-      // Dọn query để refresh không lặp lại deep-link
-      try{ history.replaceState(null,'', location.pathname + location.hash); }catch(_){}
+    try{ history.replaceState(null,'', location.pathname + location.hash); }catch(_){}
+    if(!d) return;
+    var evIdNum = ev ? parseInt(ev) : null;
+    var stillExists = evIdNum==null || events.some(function(e){ return e.id==evIdNum; });
+    if(!stillExists){
+      if(typeof _openNpDetail==='function') _openNpDetail(d, evIdNum, {msg:msg});
+      return;
     }
+    _scrollToDate(d, evIdNum);
   }catch(e){ logWarn('[DeepLink] error:', e.message||e); }
 }
 window._processDeepLink = _processDeepLink;

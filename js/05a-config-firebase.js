@@ -161,8 +161,9 @@ function _initOneSignal() {
           var data = (event && event.notification && event.notification.additionalData) || {};
           var d = data.evDate || data.date || null;
           var ev = data.evId || data.ev || null;
+          var msg = data.msg || '';
           if (d) {
-            _pendingDeepLink = { date: d, evId: ev };
+            _pendingDeepLink = { date: d, evId: ev, msg: msg };
             if (typeof _processDeepLink === 'function') _processDeepLink(); // điều hướng nếu dữ liệu đã sẵn sàng
           }
         } catch(_) {}

@@ -447,7 +447,11 @@ function delCurEv(){
   closeAdd();renderAllNoFetch();
   // Gửi push SAU KHI Firebase đã upload xong (đồng bộ data trước, push sau)
   Promise.resolve(_saveResult).then(()=>{
-    sendFCMPush(1,'🗑 Đã xoá lịch'+(_delEv?': '+_delEv.title:''));
+    const _org=(typeof _orgInfo==='function')?_orgInfo():null;
+    const _nguoiThucHien=(_org&&_org.nguoiPhuTrach)?_org.nguoiPhuTrach:'';
+    const _delMsg='🗑 Đã xoá lịch: '+(_delEv?_delEv.title:'')
+      +(_nguoiThucHien?' (do '+_nguoiThucHien+' thực hiện)':'');
+    sendFCMPush(1, _delMsg, _delEv?_delEv.id:null, _delEv?_delEv.date:null);
   });
 }
 async function clearAll(){
