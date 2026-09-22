@@ -184,6 +184,8 @@ function _syncAllBadges(){
   try{const _old=document.getElementById('notifBadge'); if(_old&&_old.parentNode) _old.parentNode.removeChild(_old);}catch(e){}
   // Badge nav chuông + số trong panel header
   if(typeof _updateMobNotifBadge==='function') _updateMobNotifBadge(n);
+  // Hiệu ứng rung+nhấp nháy trên chuông — đồng bộ cùng lúc với badge
+  _updateBellAlertState(n);
   // App icon badge = n (iOS home screen, PWA)
   setAppIconBadge(n);
   // Favicon + title badge cũng dùng n
@@ -209,6 +211,32 @@ function clearNotif(){
 let _npMsgLog = [];
 let _npScrollDate = null; // ngày cần scroll đến từ thông báo
 let _npScrollEvId = null; // id lịch cần highlight
+
+// ── Trạng thái hiệu ứng "rung + nhấp nháy" của chuông ──────────────────
+let _isNotifPanelOpen = false;
+let _bellSeenCount = 0;
+
+function _setBellAlert(active){
+  const b1=document.getElementById('hdrNotifBell');
+  const b2=document.getElementById('mobNotifBtn');
+  [b1,b2].forEach(function(b){ if(b) b.classList.toggle('notif-alert', !!active); });
+}
+
+function _updateBellAlertState(n){
+  if(_isNotifPanelOpen){
+    _setBellAlert(false);
+    _bellSeenCount = n;
+    return;
+  }
+  if(n<=0){
+    _setBellAlert(false);
+    _bellSeenCount = 0;
+    return;
+  }
+  if(n>_bellSeenCount){
+    _setBellAlert(true);
+  }
+}
 (function(){
   try{_npMsgLog=JSON.parse(localStorage.getItem('llv_np_log')||'[]');}catch(e){_npMsgLog=[];}
   // Dọn trùng cũ: giữ mục ĐẦU TIÊN cho mỗi evId (bản trước có thể đã lưu trùng 2 lần)
@@ -338,7 +366,13 @@ async function _scrollToDate(dateStr, evId){
     if(!cards) return;
     // Tìm đúng card theo data-date (không dùng text search)
     var card=cards.querySelector('[data-date="'+dateStr+'"]');
-    if(!card) return;
+    if(!card){
+      // Phòng trường hợp DOM chưa kịp dựng xong sau khi đổi tuần (thiết bị
+      // yếu/chậm) → thử lại thêm 1 lần sau 200ms thay vì bỏ cuộc ngay lập tức.
+      await new Promise(r=>setTimeout(r,200));
+      card=cards.querySelector('[data-date="'+dateStr+'"]');
+      if(!card) return;
+    }
 
     if(evId){
       // Có evId → scroll thẳng đến đúng dòng lịch, không scroll card trước
@@ -402,6 +436,8 @@ async function _scrollToDate(dateStr, evId){
 }
 
 function openNotifPanel(){
+  _isNotifPanelOpen = true;
+  _setBellAlert(false);
   // Chặn scroll lan ra ngoài — gắn một lần
   const npList = document.getElementById('npList');
   if(npList && !npList._scrollLocked){
@@ -469,6 +505,7 @@ function closeNotifPanel(){
   document.getElementById('npOverlay').classList.remove('open');
   const bell=document.getElementById('hdrNotifBell');
   if(bell) bell.classList.remove('open');
+  _isNotifPanelOpen = false;
 }
 
 function clearNotifPanel(){
@@ -570,7 +607,8 @@ function _npItemClick(el){
   }
 
   // Nếu date null — thử tìm từ events theo ts hoặc title
-  if(!date){
+  let mDate=date, mEvId=evId?parseInt(evId):null;
+  if(!mDate){
     let matched=events.find(e=>e.isNew&&Math.abs(e.isNew-ts)<30000);
     if(!matched){
       const msg=npItem.msg||'';
@@ -583,18 +621,32 @@ function _npItemClick(el){
         });
       }
     }
-    if(matched){
-      el.setAttribute('data-date',matched.date);
-      el.setAttribute('data-evid',matched.id);
-      _scrollToDate(matched.date, matched.id);
-    } else {
-      closeNotifPanel();
-    }
+    if(matched){ mDate=matched.date; mEvId=matched.id; }
+  }
+
+  if(!mDate){
+    // Không xác định được lịch nào cả (kể cả suy luận cũng không ra) → coi
+    // như đã bị xoá, hiện form thông báo thay vì im lặng đóng panel.
+    closeNotifPanel();
+    _openNpDetail(null, null, npItem);
+    return;
+  }
+
+  // Lịch này còn tồn tại hay đã bị xoá? Chỉ khi có evId cụ thể mới xác định
+  // chắc chắn được (không có evId — thông báo dạng cũ — thì không đủ căn cứ
+  // để kết luận là đã xoá, cứ cuộn đến ngày như trước).
+  const stillExists = mEvId==null || events.some(e=>e.id==mEvId);
+  if(!stillExists){
+    // Lịch đã bị xoá → hiện form "đã bị xoá" gọn gàng (dùng chung modal với
+    // desktop) thay vì cuộn đến một vị trí giờ đã trống rỗng, không có gì
+    // để xem, khiến người dùng không hiểu chuyện gì đã xảy ra.
+    closeNotifPanel();
+    _openNpDetail(mDate, mEvId, npItem);
     return;
   }
 
   // Navigate đến đúng ngày/lịch (mobile)
-  _scrollToDate(date, evId?parseInt(evId):null);
+  _scrollToDate(mDate, mEvId);
 }
 
 // ── Modal xem chi tiết lịch từ thông báo (desktop) ──────────────
