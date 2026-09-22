@@ -4,6 +4,29 @@
 // ════════════════════════════════════════
 function nav(dir){wkOff+=dir;wxData=null;wxFetchedAt=0;renderAll();}
 function goToday(){wkOff=0;wxData=null;wxFetchedAt=0;renderAll();}
+
+// ── Thông tin cơ quan dùng chung cho In / Xuất Word ──
+// Luôn lấy từ ORG_CONFIG; fallback chỉ dùng khi ORG_CONFIG chưa load.
+function _orgInfo(){
+  if(typeof ORG_CONFIG!=='undefined' && ORG_CONFIG) return ORG_CONFIG;
+  return {tenCoQuan:'UBND XÃ TÂY TRÀ',capCoQuan:'Uỷ ban nhân dân',tenNgan:'Xã Tây Trà',
+          donVi:'xã Tây Trà',diaDanh:'Tây Trà',nguoiPhuTrach:'Ông Hồ Phúc Long',
+          soDienThoai:'0398.704.755',loai:'ubnd'};
+}
+// Tên ngắn viết HOA, đã bỏ tiền tố cơ quan nếu trùng lặp. VD: 'Xã Tây Trà' → 'XÃ TÂY TRÀ'
+function _orgTenNgan(o){
+  o=o||_orgInfo();
+  return String(o.tenNgan||o.tenCoQuan||'')
+    .replace(/^\s*(UBND|U[ỶY]\s+BAN\s+NHÂN\s+DÂN)\s+/i,'')
+    .trim().toUpperCase();
+}
+// Tiêu đề văn bản: 'LỊCH LÀM VIỆC CỦA UỶ BAN NHÂN DÂN XÃ TÂY TRÀ'
+function _orgTieuDeLich(o){
+  o=o||_orgInfo();
+  var ten=_orgTenNgan(o);
+  if(o.loai==='dang_uy') return 'LỊCH LÀM VIỆC CỦA '+ten;
+  return 'LỊCH LÀM VIỆC CỦA UỶ BAN NHÂN DÂN '+ten;
+}
 // Lazy-load thư viện SheetJS (XLSX) — chỉ tải khi cần đọc/xuất Excel, tránh nặng trang.
 function _ensureXlsx(cb){
   if(typeof XLSX!=='undefined'){cb();return;}
@@ -223,7 +246,7 @@ function closePrintModal(){
 function doPrint(){
   const ws=wkStart(wkOff);const we=addDays(ws,6);const wn=wkNum(ws);
   const days=Array.from({length:7},(_,i)=>addDays(ws,i));
-  var _org=typeof ORG_CONFIG!=='undefined'?ORG_CONFIG:{tenCoQuan:'UBND XÃ TÂY TRÀ BỒNG',capCoQuan:'Uỷ ban nhân dân',tenNgan:'Xã Tây Trà Bồng',donVi:'xã Tây Trà Bồng',nguoiPhuTrach:'Ông Hồ Phúc Long',soDienThoai:'0398.704.755'};
+  var _org=_orgInfo();
   const now=new Date();
   const ngayKy=(_org.diaDanh||_org.donVi)+', ngày '+String(now.getDate()).padStart(2,'0')+' tháng '+(now.getMonth()+1)+' năm '+now.getFullYear();
 
@@ -265,10 +288,11 @@ function doPrint(){
     +'table{border-collapse:collapse;width:100%}'
     +'</style></head><body>'
     +'<table style="width:100%;margin-bottom:6pt;border:none"><tr>'
-    +'<td style="width:50%;text-align:center;border:none;font-family:Times New Roman;font-size:10pt"><b>UỶ BAN NHÂN DÂN</b><br><b><u>'+(_org.tenNgan||_org.tenCoQuan).toUpperCase()+'</u></b></td>'
+    +'<td style="width:50%;text-align:center;border:none;font-family:Times New Roman;font-size:10pt">'
+      +(_org.loai==='dang_uy'?'':'<b>UỶ BAN NHÂN DÂN</b><br>')+'<b><u>'+_orgTenNgan(_org)+'</u></b></td>'
     +'<td style="width:50%;text-align:center;border:none;font-family:Times New Roman;font-size:10pt"><b>CỘNG HOÀ XÃ HỘI CHỦ NGHĨA VIỆT NAM</b><br><b><u>Độc lập - Tự do - Hạnh phúc</u></b><br><i>'+ngayKy+'</i></td>'
     +'</tr></table>'
-    +'<p style="text-align:center;font-size:13pt;font-weight:bold;font-family:Times New Roman;margin:4pt 0 2pt">LỊCH LÀM VIỆC CỦA UỶ BAN NHÂN DÂN XÃ TÂY TRÀ BỒNG</p>'
+    +'<p style="text-align:center;font-size:13pt;font-weight:bold;font-family:Times New Roman;margin:4pt 0 2pt">'+_orgTieuDeLich(_org)+'</p>'
     +'<p style="text-align:center;font-size:9.5pt;font-style:italic;font-family:Times New Roman;margin:0 0 6pt">(Tuần '+wn+': Từ ngày '+fmtVi(ws)+' đến ngày '+fmtVi(we)+')</p>'
     +'<table style="width:100%;border-collapse:collapse">'
     +'<colgroup><col style="width:8%"><col style="width:7%"><col style="width:27%"><col style="width:14%"><col style="width:14%"><col style="width:15%"><col style="width:15%"></colgroup>'
@@ -295,7 +319,7 @@ function exportWord(){
   if(typeof docx==='undefined'){_ensureDocx(()=>exportWord());return;}
   const ws=wkStart(wkOff);const we=addDays(ws,6);const wn=wkNum(ws);
   const days=Array.from({length:7},(_,i)=>addDays(ws,i));
-  var _org=typeof ORG_CONFIG!=='undefined'?ORG_CONFIG:{tenCoQuan:'UBND XÃ TÂY TRÀ BỒNG',capCoQuan:'Uỷ ban nhân dân',tenNgan:'Xã Tây Trà Bồng',donVi:'xã Tây Trà Bồng',nguoiPhuTrach:'Ông Hồ Phúc Long',soDienThoai:'0398.704.755'};
+  var _org=_orgInfo();
   const now=new Date();
   const ngayKy=(_org.diaDanh||_org.donVi)+', ngày '+String(now.getDate()).padStart(2,'0')+' tháng '+(now.getMonth()+1)+' năm '+now.getFullYear();
 
@@ -345,8 +369,10 @@ function exportWord(){
   const qhTable=new Table({width:{size:W,type:WidthType.DXA},columnWidths:[W/2,W/2],
     rows:[new TableRow({children:[
       new TableCell({borders:noBrds,shading:{fill:'FFFFFF',type:ShadingType.CLEAR},margins:mg,width:{size:W/2,type:WidthType.DXA},
-        children:[p('UỶ BAN NHÂN DÂN',{center:true,bold:true,sz:22}),
-                  p((_org.tenNgan||_org.tenCoQuan).toUpperCase(),{center:true,bold:true,sz:22,ul:true})]}),
+        children:(_org.loai==='dang_uy'
+          ?[p(_orgTenNgan(_org),{center:true,bold:true,sz:22,ul:true})]
+          :[p('UỶ BAN NHÂN DÂN',{center:true,bold:true,sz:22}),
+            p(_orgTenNgan(_org),{center:true,bold:true,sz:22,ul:true})])}),
       new TableCell({borders:noBrds,shading:{fill:'FFFFFF',type:ShadingType.CLEAR},margins:mg,width:{size:W/2,type:WidthType.DXA},
         children:[p('CỘNG HOÀ XÃ HỘI CHỦ NGHĨA VIỆT NAM',{center:true,bold:true,sz:22}),
                   p('Độc lập - Tự do - Hạnh phúc',{center:true,bold:true,sz:22,ul:true}),
@@ -426,7 +452,7 @@ function exportWord(){
     children:[
       qhTable,
       p(''),
-      p('LỊCH LÀM VIỆC CỦA UỶ BAN NHÂN DÂN XÃ TÂY TRÀ BỒNG',{center:true,bold:true,sz:26,before:80,after:40}),
+      p(_orgTieuDeLich(_org),{center:true,bold:true,sz:26,before:80,after:40}),
       p('(Tuần '+wn+': Từ ngày '+fmtVi(ws)+' đến ngày '+fmtVi(we)+')',{center:true,it:true,sz:22,after:120}),
       mainTable,
       p('Ghi chú: Ngoài thời gian đã bố trí lịch nêu trên, các đồng chí Lãnh đạo UBND xã xử lý công việc tại cơ quan.',{it:true,sz:20,before:120}),
