@@ -29,6 +29,17 @@ const ORG_CONFIG = {
   loai:           'ubnd',
 };
 
+// ── Thông tin tác giả hệ thống — hiện khi bấm chuột phải (right-click) trên
+//    desktop. Đây là thông tin về người xây dựng/vận hành phần mềm, KHÔNG
+//    phải người phụ trách của đơn vị (ORG_CONFIG ở trên). Chỉnh sửa 3 dòng
+//    dưới đây cho đúng thông tin thật của bạn.
+const AUTHOR_INFO = {
+  hoTen:          'Nguyễn Duy Ka',                                    // Tên tác giả
+  noiCongTac:     'Chuyên viên Phòng Văn hóa - Xã hội xã Trà Bồng',   // Nơi công tác
+  soDienThoai:    '0917.921.999',                                     // SĐT liên hệ
+  diaChi:         'Xã Trà Bồng, tỉnh Quảng Ngãi',                     // Địa chỉ
+};
+
 // ── Mẫu config cho Đảng ủy (copy vào ORG_CONFIG khi dùng cho Đảng ủy) ──
 // const ORG_CONFIG = {
 //   tenCoQuan:     'Đảng ủy Xã Tây Trà Bồng',
